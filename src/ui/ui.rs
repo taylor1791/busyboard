@@ -1,66 +1,50 @@
-use crate::eater::Cpu;
 use crossterm::{
     ExecutableCommand,
     self,
     terminal,
-    event::{self, KeyCode, KeyEvent, KeyEventKind},
+    event,
 };
-use ratatui::prelude::{CrosstermBackend, Stylize, Widget};
-use std::cell::RefCell;
-use std::rc::Rc;
+use ratatui::{
+    widgets::WidgetRef,
+    prelude::{CrosstermBackend, Widget},
+};
 use std::{
     time::Duration,
-    io::{Result, Stdout, stdout},
+    io::{ Result, self, stdout},
 };
 
-type Tui = ratatui::terminal::Terminal<CrosstermBackend<Stdout>>;
+type Tui = ratatui::terminal::Terminal<CrosstermBackend<io::Stdout>>;
 
 pub struct Ui {
-    clock_speed: Duration,
-    cpu: Cpu,
-    mode: Mode,
+    action_deadline: Duration,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Mode {
-    Execute,
-    Exit,
-    Step,
-}
+pub trait ActionLoop {
+    type Action;
 
-impl Widget for &Ui {
-    fn render(self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
-        ratatui::widgets::Paragraph::new(format!("a: {:03} ip: {:03}", self.cpu.a(), self.cpu.ip()))
-            .white()
-            .on_blue()
-            .render(area, buffer);
-    }
+    fn action(&self, key: event::KeyEvent) -> Option<Self::Action>;
+    fn exited(&self) -> bool;
+    fn deadline_expired(&self) -> Option<Self::Action>;
+    fn update(&mut self, action: Self::Action);
 }
 
 impl Ui {
-    pub fn new(cpu: Cpu) -> Self {
-        let output = Rc::new(RefCell::new(Vec::<u8>::new()));
-
-        let me = Self {
-            clock_speed: Duration::from_millis(1000),
-            cpu: cpu.with_out(move |byte| {
-                output.borrow_mut().push(byte);
-            }),
-            mode: Mode::Execute,
-        };
-
-        me
+    pub fn new(action_deadline: Duration) -> Self {
+        Self { action_deadline }
     }
 
-    pub fn start(&mut self) -> Result<()> {
+    pub fn run<W>(&self, widget: W) -> Result<()>
+    where
+        W: ActionLoop + WidgetRef,
+    {
         let terminal = self.setup()?;
-        self.main_loop(terminal)?;
+        self.main_loop(terminal, widget)?;
         self.cleanup()?;
 
         Ok(())
     }
 
-    fn setup(&mut self) -> Result<Tui> {
+    fn setup(&self) -> Result<Tui> {
         stdout().execute(terminal::EnterAlternateScreen)?;
         terminal::enable_raw_mode()?;
         let mut terminal = Tui::new(CrosstermBackend::new(stdout()))?;
@@ -69,76 +53,54 @@ impl Ui {
         Ok(terminal)
     }
 
-    fn cleanup(&mut self) -> Result<()> {
-        stdout().execute(terminal::LeaveAlternateScreen)?;
-        terminal::disable_raw_mode()?;
-        Ok(())
-    }
-
-    fn main_loop(&mut self, mut terminal: Tui) -> Result<()> {
-        while self.mode != Mode::Exit {
-            terminal.draw(|frame| self.render(frame))?;
-            let action = self.input();
-            self.update(action);
+    fn main_loop<W>(&self, mut terminal: Tui, mut widget: W) -> Result<()>
+    where
+        W: ActionLoop + WidgetRef,
+    {
+        while !widget.exited() {
+            if let Some(action) = {
+                terminal.draw(|frame| self.render_frame(&widget, frame))?;
+                self.input(&widget)
+            } {
+                widget.update(action);
+            }
         }
 
         Ok(())
     }
 
-    fn render(&self, frame: &mut ratatui::prelude::Frame) {
-        frame.render_widget(self, frame.size());
+    fn render_frame<W>(&self, widget: W, frame: &mut ratatui::prelude::Frame)
+    where
+        W: Widget,
+    {
+        frame.render_widget(widget, frame.size());
     }
 
-    fn input(&mut self) -> Action {
+    fn input<'w, W>(&self, widget: &'w W) -> Option<<W as ActionLoop>::Action>
+    where
+        W: ActionLoop,
+    {
         let start = std::time::Instant::now();
 
         loop {
-            if self.mode == Mode::Execute && start.elapsed() > self.clock_speed {
-                return Action::Step;
+            if start.elapsed() > self.action_deadline {
+                return widget.deadline_expired();
             }
 
-            let deadline = match self.mode {
-                Mode::Execute => self.clock_speed - start.elapsed(),
-                _ => Duration::from_secs(60), // Can be arbitrarily long
-            };
-
+            let deadline = self.action_deadline - start.elapsed();
             if event::poll(deadline).unwrap() {
                 if let event::Event::Key(key) = event::read().unwrap() {
-                    if let Some(action) = self.action(key) {
-                        return action;
+                    if let Some(action) = widget.action(key) {
+                        return Some(action);
                     }
                 }
             }
         }
     }
 
-    fn action(&mut self, key: KeyEvent) -> Option<Action> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Char('q') => return Some(Action::Quit),
-                KeyCode::Char('s') if self.mode == Mode::Step => return Some(Action::Step),
-                KeyCode::Char('s') => return Some(Action::Mode(Mode::Step)),
-                _ => None,
-            }
-        } else {
-            None
-        }
+    fn cleanup(&self) -> Result<()> {
+        stdout().execute(terminal::LeaveAlternateScreen)?;
+        terminal::disable_raw_mode()?;
+        Ok(())
     }
-
-    fn update(&mut self, action: Action) {
-        match action {
-            Action::Mode(mode) => self.mode = mode,
-            Action::Quit => self.mode = Mode::Exit,
-            Action::Step => {
-                self.cpu.step();
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-enum Action {
-    Mode(Mode),
-    Quit,
-    Step,
 }

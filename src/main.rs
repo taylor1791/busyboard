@@ -1,5 +1,6 @@
 use busyboard::{
     eater::{Cpu, I},
+    simulator::Simulator,
     ui::Ui,
 };
 
@@ -15,5 +16,7 @@ fn main() -> std::io::Result<()> {
         I::hlt()
     ], vec![0x01, 0x00, 100]);
 
-    Ui::new(cpu).start()
+    let simulator = Simulator::from(cpu);
+    Ui::new(std::time::Duration::from_millis(1000))
+        .run(simulator)
 }
