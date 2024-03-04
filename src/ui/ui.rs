@@ -5,7 +5,7 @@ use crossterm::{
     terminal,
     event::{self, KeyCode, KeyEvent, KeyEventKind},
 };
-use ratatui::prelude::{CrosstermBackend, Stylize};
+use ratatui::prelude::{CrosstermBackend, Stylize, Widget};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::{
@@ -26,6 +26,15 @@ pub enum Mode {
     Execute,
     Exit,
     Step,
+}
+
+impl Widget for &Ui {
+    fn render(self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
+        ratatui::widgets::Paragraph::new(format!("a: {:03} ip: {:03}", self.cpu.a(), self.cpu.ip()))
+            .white()
+            .on_blue()
+            .render(area, buffer);
+    }
 }
 
 impl Ui {
@@ -68,7 +77,7 @@ impl Ui {
 
     fn main_loop(&mut self, mut terminal: Tui) -> Result<()> {
         while self.mode != Mode::Exit {
-            self.draw(&mut terminal)?;
+            terminal.draw(|frame| self.render(frame))?;
             let action = self.input();
             self.update(action);
         }
@@ -76,17 +85,8 @@ impl Ui {
         Ok(())
     }
 
-    fn draw(&mut self, terminal: &mut Tui) -> Result<()> {
-        terminal.draw(|frame| {
-            let size = frame.size();
-            let text = ratatui::widgets::Paragraph::new(format!("a: {:03} ip: {:03}", self.cpu.a(), self.cpu.ip()))
-                .white()
-                .on_blue();
-
-            frame.render_widget(text, size);
-        })?;
-
-        Ok(())
+    fn render(&self, frame: &mut ratatui::prelude::Frame) {
+        frame.render_widget(self, frame.size());
     }
 
     fn input(&mut self) -> Action {
