@@ -13,7 +13,7 @@ use std::{
     io::{Result, Stdout, stdout},
 };
 
-type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
+type Tui = ratatui::terminal::Terminal<CrosstermBackend<Stdout>>;
 
 pub struct Ui {
     clock_speed: Duration,
@@ -51,10 +51,10 @@ impl Ui {
         Ok(())
     }
 
-    fn setup(&mut self) -> Result<Terminal> {
+    fn setup(&mut self) -> Result<Tui> {
         stdout().execute(terminal::EnterAlternateScreen)?;
         terminal::enable_raw_mode()?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+        let mut terminal = Tui::new(CrosstermBackend::new(stdout()))?;
         terminal.clear()?;
 
         Ok(terminal)
@@ -66,7 +66,7 @@ impl Ui {
         Ok(())
     }
 
-    fn main_loop(&mut self, mut terminal: Terminal) -> Result<()> {
+    fn main_loop(&mut self, mut terminal: Tui) -> Result<()> {
         while self.mode != Mode::Exit {
             self.draw(&mut terminal)?;
             let action = self.input();
@@ -76,7 +76,7 @@ impl Ui {
         Ok(())
     }
 
-    fn draw(&mut self, terminal: &mut Terminal) -> Result<()> {
+    fn draw(&mut self, terminal: &mut Tui) -> Result<()> {
         terminal.draw(|frame| {
             let size = frame.size();
             let text = ratatui::widgets::Paragraph::new(format!("a: {:03} ip: {:03}", self.cpu.a(), self.cpu.ip()))
