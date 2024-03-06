@@ -1,6 +1,11 @@
+mod hexdump;
+
 use crate::{eater::Cpu, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
-use ratatui::prelude::{Stylize, Widget};
+use ratatui::{
+    prelude::{Layout, Rect, Widget},
+    widgets::{Block, Padding, Paragraph},
+};
 
 pub struct Simulator {
     cpu: Cpu,
@@ -66,10 +71,25 @@ impl ActionLoop for Simulator {
 }
 
 impl ratatui::widgets::WidgetRef for Simulator {
-    fn render_ref(&self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
-        ratatui::widgets::Paragraph::new(format!("a: {:03} ip: {:03}", self.cpu.a(), self.cpu.ip()))
-            .white()
-            .on_blue()
-            .render(area, buffer);
+    fn render_ref(&self, area: Rect, buffer: &mut ratatui::prelude::Buffer) {
+        let area = Layout::horizontal(vec![
+            // | 00: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX |
+            ratatui::prelude::Constraint::Length(3 * 17 + 2 + 2),
+        ]).split(area)[0];
+
+        let areas = Layout::vertical(vec![ratatui::prelude::Constraint::Max(16)]).split(area);
+        let dump = hexdump::hexdump(self.cpu.ip(), &self.cpu.read_bytes(0, self.cpu.len() as u8));
+
+        dump.render(areas[0], buffer);
+    }
+}
+
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Mode::Execute => write!(f, "Execute"),
+            Mode::Exit => write!(f, "Exiting"),
+            Mode::Step => write!(f, "Step"),
+        }
     }
 }

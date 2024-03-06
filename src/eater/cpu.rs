@@ -76,6 +76,11 @@ impl Cpu {
         self.ip
     }
 
+    /// Returns the number of bytes in the RAM.
+    pub fn len(&self) -> usize {
+        self.ram.len()
+    }
+
     pub (super) fn read(&mut self, adr: u8) -> Option<u8> {
         if adr as usize >= self.ram.len() {
             self.set(Flag::IllegalHalt);
@@ -85,14 +90,9 @@ impl Cpu {
         Some(self.ram[adr as usize])
     }
 
-    pub fn read_bytes(&mut self, adr: u8, len: u8) -> &[u8] {
+    pub fn read_bytes(&self, adr: u8, len: u8) -> &[u8] {
         let start = adr as usize;
-        let end = adr as usize + len as usize;
-        if end > self.ram.len() {
-            self.set(Flag::IllegalHalt);
-
-            return &[]
-        }
+        let end = (adr as usize + len as usize).min(self.ram.len());
 
         &self.ram[start..end]
     }
