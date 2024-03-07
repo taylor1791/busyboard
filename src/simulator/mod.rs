@@ -1,6 +1,7 @@
 mod hexdump;
+mod registers;
 
-use crate::{eater::Cpu, ui::ActionLoop};
+use crate::{eater::{Cpu, Flag}, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
     prelude::{Layout, Rect, Stylize, Widget},
@@ -28,13 +29,23 @@ pub enum Action {
 }
 
 pub struct Ui {
+    previous_ax: u8,
     previous_bytes: Vec<u8>,
+    previous_ip: u8,
+    previous_flag_c: bool,
+    previous_flag_h: bool,
+    previous_flag_i: bool,
 }
 
 impl Simulator {
     pub fn from(cpu: Cpu) -> Self {
         let ui = Ui {
+            previous_ax: cpu.a(),
             previous_bytes: cpu.read_bytes(0, cpu.len() as u8).to_vec(),
+            previous_ip: cpu.ip(),
+            previous_flag_c: cpu.get(Flag::Carry),
+            previous_flag_h: cpu.get(Flag::Halt),
+            previous_flag_i: cpu.get(Flag::IllegalHalt),
         };
 
         Self { cpu, mode: Mode::Execute, ui }
@@ -67,6 +78,11 @@ impl ActionLoop for Simulator {
 
     fn update(&mut self, action: Self::Action) {
         self.ui.previous_bytes = self.cpu.read_bytes(0, self.cpu.len() as u8).to_vec();
+        self.ui.previous_ax = self.cpu.a();
+        self.ui.previous_ip = self.cpu.ip();
+        self.ui.previous_flag_c = self.cpu.get(Flag::Carry);
+        self.ui.previous_flag_h = self.cpu.get(Flag::Halt);
+        self.ui.previous_flag_i = self.cpu.get(Flag::IllegalHalt);
 
          match action {
              Action::Mode(mode) => self.mode = mode,
@@ -86,10 +102,12 @@ impl ratatui::widgets::WidgetRef for Simulator {
         ]).split(area)[0];
 
         let areas = Layout::vertical(vec![
+            ratatui::prelude::Constraint::Max(16),
             ratatui::prelude::Constraint::Length(3),
             ratatui::prelude::Constraint::Max(16),
         ]).split(area);
 
+        let registers = registers::registers(&self.cpu, &self.ui);
         let mode = Paragraph::new(format!("Mode: {}", self.mode).bold())
             .block(Block::new().padding(Padding::uniform(1)));
 
@@ -99,8 +117,9 @@ impl ratatui::widgets::WidgetRef for Simulator {
             &self.ui.previous_bytes,
         );
 
-        mode.render(areas[0], buffer);
-        dump.render(areas[1], buffer);
+        registers.render(areas[0], buffer);
+        mode.render(areas[1], buffer);
+        dump.render(areas[2], buffer);
     }
 }
 
