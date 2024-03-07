@@ -4,12 +4,12 @@ use crate::{eater::Cpu, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
     prelude::{Layout, Rect, Widget},
-    widgets::{Block, Padding, Paragraph},
 };
 
 pub struct Simulator {
     cpu: Cpu,
     mode: Mode,
+    ui: Ui
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -26,12 +26,17 @@ pub enum Action {
     Step,
 }
 
+pub struct Ui {
+    previous_bytes: Vec<u8>,
+}
+
 impl Simulator {
     pub fn from(cpu: Cpu) -> Self {
-        Self {
-            cpu,
-            mode: Mode::Execute,
-        }
+        let ui = Ui {
+            previous_bytes: cpu.read_bytes(0, cpu.len() as u8).to_vec(),
+        };
+
+        Self { cpu, mode: Mode::Execute, ui }
     }
 }
 
@@ -60,6 +65,8 @@ impl ActionLoop for Simulator {
     }
 
     fn update(&mut self, action: Self::Action) {
+        self.ui.previous_bytes = self.cpu.read_bytes(0, self.cpu.len() as u8).to_vec();
+
          match action {
              Action::Mode(mode) => self.mode = mode,
              Action::Quit => self.mode = Mode::Exit,
@@ -78,7 +85,11 @@ impl ratatui::widgets::WidgetRef for Simulator {
         ]).split(area)[0];
 
         let areas = Layout::vertical(vec![ratatui::prelude::Constraint::Max(16)]).split(area);
-        let dump = hexdump::hexdump(self.cpu.ip(), &self.cpu.read_bytes(0, self.cpu.len() as u8));
+        let dump = hexdump::hexdump(
+            self.cpu.ip(),
+            &self.cpu.read_bytes(0, self.cpu.len() as u8),
+            &self.ui.previous_bytes,
+        );
 
         dump.render(areas[0], buffer);
     }
