@@ -3,7 +3,8 @@ mod hexdump;
 use crate::{eater::Cpu, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
-    prelude::{Layout, Rect, Widget},
+    prelude::{Layout, Rect, Stylize, Widget},
+    widgets::{Block, Padding, Paragraph},
 };
 
 pub struct Simulator {
@@ -84,14 +85,22 @@ impl ratatui::widgets::WidgetRef for Simulator {
             ratatui::prelude::Constraint::Length(3 * 17 + 2 + 2),
         ]).split(area)[0];
 
-        let areas = Layout::vertical(vec![ratatui::prelude::Constraint::Max(16)]).split(area);
+        let areas = Layout::vertical(vec![
+            ratatui::prelude::Constraint::Length(3),
+            ratatui::prelude::Constraint::Max(16),
+        ]).split(area);
+
+        let mode = Paragraph::new(format!("Mode: {}", self.mode).bold())
+            .block(Block::new().padding(Padding::uniform(1)));
+
         let dump = hexdump::hexdump(
             self.cpu.ip(),
             &self.cpu.read_bytes(0, self.cpu.len() as u8),
             &self.ui.previous_bytes,
         );
 
-        dump.render(areas[0], buffer);
+        mode.render(areas[0], buffer);
+        dump.render(areas[1], buffer);
     }
 }
 
