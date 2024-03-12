@@ -4,8 +4,8 @@ mod registers;
 use crate::{eater::{Cpu, Flag}, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
-    prelude::{Layout, Rect, Stylize, Widget},
-    widgets::{Block, Padding, Paragraph},
+    prelude::{Layout, Line, Rect, Stylize, Widget},
+    widgets::Block,
 };
 
 pub struct Simulator {
@@ -96,30 +96,41 @@ impl ActionLoop for Simulator {
 
 impl ratatui::widgets::WidgetRef for Simulator {
     fn render_ref(&self, area: Rect, buffer: &mut ratatui::prelude::Buffer) {
-        let area = Layout::horizontal(vec![
-            // | 00: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX |
-            ratatui::prelude::Constraint::Length(3 * 17 + 2 + 2),
-        ]).split(area)[0];
+        let bytes = self.cpu.read_bytes(0, self.cpu.len() as u8);
 
-        let areas = Layout::vertical(vec![
-            ratatui::prelude::Constraint::Max(16),
-            ratatui::prelude::Constraint::Length(3),
-            ratatui::prelude::Constraint::Max(16),
-        ]).split(area);
+        let chrome_height = 2;
+        let instructions = Line::from(vec![
+            format!(" {}:", self.mode.to_string()).bold().magenta(),
+            " Step ".bold().into(),
+            "<s>".blue().bold(),
+            " Quit ".bold().into(),
+            "<q> ".blue().bold(),
+        ]);
+        let chrome = Block::bordered()
+            .title("Simulator")
+            .title_bottom(instructions.centered());
 
+        let registers_width = 9 + 2; // The word "Registers" plus right padding
+        let register_height = 7; // Title, AX, IP, C, H, I, padding
         let registers = registers::registers(&self.cpu, &self.ui);
-        let mode = Paragraph::new(format!("Mode: {}", self.mode).bold())
-            .block(Block::new().padding(Padding::uniform(1)));
 
-        let dump = hexdump::hexdump(
-            self.cpu.ip(),
-            &self.cpu.read_bytes(0, self.cpu.len() as u8),
-            &self.ui.previous_bytes,
-        );
+        // Each byte is 2 characters, plus a space (or a colon), horizontal padding, and a border.
+        let dump_width = 17 * 3 + 2 + 2;
+        let dump_height = 1 + ((bytes.len() + 15) / 16) as u16 + 2; // Title + Lines + border
+        let dump = hexdump::hexdump(self.cpu.ip(), &bytes, &self.ui.previous_bytes);
 
-        registers.render(areas[0], buffer);
-        mode.render(areas[1], buffer);
-        dump.render(areas[2], buffer);
+        let width = dump_width + 2; // Add 2 for the border
+        let height = chrome_height + register_height + dump_height;
+        let area = Rect::new(area.x, area.y, width, area.height.min(height));
+        let areas = Layout::vertical(vec![
+            ratatui::prelude::Constraint::Length(register_height),
+            ratatui::prelude::Constraint::Length(dump_height),
+        ]).split(Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2));
+        let register_area = Rect::new(areas[0].width - registers_width, areas[0].y, registers_width, register_height);
+
+        chrome.render(area, buffer);
+        registers.render(register_area, buffer);
+        dump.render(areas[1], buffer);
     }
 }
 
