@@ -1,3 +1,4 @@
+mod disassemble;
 mod hexdump;
 mod registers;
 mod out;
@@ -6,7 +7,7 @@ use crate::{eater::{Cpu, Flag}, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
     prelude::{Layout, Line, Rect, Stylize, Widget},
-    widgets::Block,
+    widgets::{Block, Padding, Paragraph},
 };
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -141,6 +142,17 @@ impl ratatui::widgets::WidgetRef for Simulator {
             .title("Simulator")
             .title_bottom(instructions.centered());
 
+        let disassembled = crate::eater::disassemble(&bytes);
+        let disassembly = disassemble::disassemble(
+            &disassembled,
+            self.cpu.ip(),
+            &bytes,
+            &self.ui.previous_bytes
+        );
+        let disassembly_height = disassembly.len() as u16 + 1; // Instructions + padding
+        let disassembly = Paragraph::new(disassembly)
+            .block(Block::new().padding(Padding::horizontal(1)));
+
         let registers_width = 9 + 2; // The word "Registers" plus right padding
         let register_height = 7; // Title, AX, IP, C, H, I, padding
         let registers = registers::registers(&self.cpu, &self.ui);
@@ -154,16 +166,17 @@ impl ratatui::widgets::WidgetRef for Simulator {
         let dump = hexdump::hexdump(self.cpu.ip(), &bytes, &self.ui.previous_bytes);
 
         let width = dump_width + 2; // Add 2 for the border
-        let height = chrome_height + register_height + out_height + dump_height;
+        let height = chrome_height + disassembly_height.max(register_height) + out_height + dump_height;
         let area = Rect::new(area.x, area.y, width, area.height.min(height));
         let areas = Layout::vertical(vec![
-            ratatui::prelude::Constraint::Length(register_height),
+            ratatui::prelude::Constraint::Length(disassembly_height),
             ratatui::prelude::Constraint::Length(out_height),
             ratatui::prelude::Constraint::Length(dump_height),
         ]).split(Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2));
         let register_area = Rect::new(areas[0].width - registers_width, areas[0].y, registers_width, register_height);
 
         chrome.render(area, buffer);
+        disassembly.render(areas[0], buffer);
         registers.render(register_area, buffer);
         out.render(areas[1], buffer);
         dump.render(areas[2], buffer);
