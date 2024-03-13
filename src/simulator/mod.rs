@@ -1,4 +1,5 @@
 mod disassemble;
+mod instructions;
 mod hexdump;
 mod registers;
 mod out;
@@ -6,7 +7,7 @@ mod out;
 use crate::{eater::{Cpu, Flag}, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
 use ratatui::{
-    prelude::{Layout, Line, Rect, Stylize, Widget},
+    prelude::{Layout, Rect, Widget},
     widgets::{Block, Padding, Paragraph},
 };
 use std::rc::Rc;
@@ -21,15 +22,33 @@ pub struct Simulator {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Mode {
+    Edit(Edit),
     Execute,
     Exit,
     Step,
 }
 
+impl Mode {
+    fn is_edit(&self) -> bool {
+        match self {
+            Mode::Edit(..) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Edit {
+    IP,
+    Data,
+}
+
 #[derive(Debug)]
 pub enum Action {
+    Increment,
     Mode(Mode),
     Quit,
+    Shift,
     Step,
 }
 
@@ -88,9 +107,16 @@ impl ActionLoop for Simulator {
 
     fn action(&self, key: KeyEvent) -> Option<Self::Action> {
         match key.code {
-            KeyCode::Char('q') => return Some(Action::Quit),
-            KeyCode::Char('s') if self.mode == Mode::Step => return Some(Action::Step),
-            KeyCode::Char('s') => return Some(Action::Mode(Mode::Step)),
+            KeyCode::Char('s') if self.mode == Mode::Execute => Some(Action::Mode(Mode::Step)),
+            KeyCode::Char('d') if self.mode == Mode::Execute => Some(Action::Mode(Mode::Edit(Edit::IP))),
+            KeyCode::Char('a') if self.mode == Mode::Step => Some(Action::Mode(Mode::Execute)),
+            KeyCode::Char('s') if self.mode == Mode::Step => Some(Action::Step),
+            KeyCode::Char('d') if self.mode == Mode::Step => Some(Action::Mode(Mode::Edit(Edit::IP))),
+            KeyCode::Char('a') if self.mode.is_edit() => Some(Action::Increment),
+            KeyCode::Char('s') if self.mode.is_edit() => Some(Action::Shift),
+            KeyCode::Char('d') if self.mode == Mode::Edit(Edit::IP) => Some(Action::Mode(Mode::Edit(Edit::Data))),
+            KeyCode::Char('d') if self.mode == Mode::Edit(Edit::Data) => Some(Action::Mode(Mode::Step)),
+            KeyCode::Char('q') => Some(Action::Quit),
             _ => None,
         }
     }
@@ -117,11 +143,27 @@ impl ActionLoop for Simulator {
         self.ui.previous_flag_i = self.cpu.get(Flag::IllegalHalt);
 
          match action {
-             Action::Mode(mode) => self.mode = mode,
-             Action::Quit => self.mode = Mode::Exit,
-             Action::Step => {
-                 self.cpu.step();
-             }
+            Action::Increment => {
+                match self.mode {
+                    Mode::Edit(Edit::IP) => self.cpu.goto(self.cpu.ip().wrapping_add(1)),
+                    Mode::Edit(Edit::Data) => {
+                        let value = self.cpu.read(self.cpu.ip()).unwrap_or(0_u8);
+                        self.cpu.write(self.cpu.ip(), value.wrapping_add(1))
+                    },
+                    _ => (),
+                }
+            },
+            Action::Mode(mode) => self.mode = mode,
+            Action::Quit => self.mode = Mode::Exit,
+            Action::Shift if self.mode == Mode::Edit(Edit::IP) => self.cpu.goto(self.cpu.ip().wrapping_mul(2)),
+            Action::Shift if self.mode == Mode::Edit(Edit::Data) => {
+                let value = self.cpu.read(self.cpu.ip()).unwrap_or(0_u8);
+                self.cpu.write(self.cpu.ip(), value.wrapping_mul(2))
+            },
+            Action::Shift => (),
+            Action::Step => {
+                self.cpu.step();
+            },
          }
     }
 }
@@ -131,13 +173,7 @@ impl ratatui::widgets::WidgetRef for Simulator {
         let bytes = self.cpu.read_bytes(0, self.cpu.len() as u8);
 
         let chrome_height = 2;
-        let instructions = Line::from(vec![
-            format!(" {}:", self.mode.to_string()).bold().magenta(),
-            " Step ".bold().into(),
-            "<s>".blue().bold(),
-            " Quit ".bold().into(),
-            "<q> ".blue().bold(),
-        ]);
+        let instructions = instructions::instructions(&self.mode);
         let chrome = Block::bordered()
             .title("Simulator")
             .title_bottom(instructions.centered());
@@ -186,6 +222,7 @@ impl ratatui::widgets::WidgetRef for Simulator {
 impl std::fmt::Display for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Mode::Edit(..) => write!(f, "Edit"),
             Mode::Execute => write!(f, "Execute"),
             Mode::Exit => write!(f, "Exiting"),
             Mode::Step => write!(f, "Step"),

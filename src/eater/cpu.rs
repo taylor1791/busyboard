@@ -61,6 +61,23 @@ impl Cpu {
         self.flags & (1 << flag as u8) != 0
     }
 
+    /// Sets the IP to the given value.
+    /// ```
+    /// use busyboard::eater::{Cpu, Flag, I};
+    /// let mut cpu = Cpu::from_asm(vec![
+    ///    I::ldi(0xdf),
+    ///    I::hlt(),
+    /// ], vec![]);
+    ///
+    /// cpu.goto(2);
+    /// cpu.step();
+    /// assert_eq!(cpu.a(), 0x0);
+    /// assert_eq!(cpu.ip(), 2);
+    /// ```
+    pub fn goto(&mut self, ip: u8) {
+        self.ip = ip;
+    }
+
     /// Returns the contents of the instruction pointer.
     /// ```
     /// use busyboard::eater::{Cpu, Flag, I};
