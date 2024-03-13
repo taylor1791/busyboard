@@ -1,6 +1,18 @@
 use super::{Cpu, Flag};
 
-pub struct I(Instr);
+pub enum I {
+    Nop(Nop),
+    Ldi(Ldi),
+    Lda(Lda),
+    Sta(Sta),
+    Add(Add),
+    Sub(Sub),
+    Jmp(Jmp),
+    Jpz(Jpz),
+    Jpc(Jpc),
+    Out(Out),
+    Hlt(Hlt),
+}
 
 impl I {
     /// No operation; simply increments the instruction pointer.
@@ -15,7 +27,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 1);
     /// ```
     pub fn nop() -> Self {
-        I(Instr::Nop(Nop))
+        I::Nop(Nop)
     }
 
     /// Load the immediate value specified by the instruction data into register A.
@@ -31,7 +43,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 2);
     /// ```
     pub fn ldi(value: u8) -> Self {
-        I(Instr::Ldi(Ldi(value)))
+        I::Ldi(Ldi(value))
     }
 
     /// Load the value from RAM at the address specified by the instruction data into register A.
@@ -43,7 +55,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 2);
     /// ```
     pub fn lda(address: u8) -> Self {
-        I(Instr::Lda(Lda(address)))
+        I::Lda(Lda(address))
     }
 
     /// Store the contents of register A at the memory address specified by the instruction data.
@@ -60,7 +72,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 4);
     /// ```
     pub fn sta(address: u8) -> Self {
-        I(Instr::Sta(Sta(address)))
+        I::Sta(Sta(address))
     }
 
     /// Calculate the sum of A and the value at the address specified by the instruction data and store the result in A.
@@ -83,7 +95,7 @@ impl I {
     /// // assert_eq!(cpu.ip(), 6);
     /// ```
     pub fn add(address: u8) -> Self {
-        I(Instr::Add(Add(address)))
+        I::Add(Add(address))
     }
 
     //////////////////
@@ -107,7 +119,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 6);
     /// ```
     pub fn sub(address: u8) -> Self {
-        I(Instr::Sub(Sub(address)))
+        I::Sub(Sub(address))
     }
 
     /// Jump to the address specified by the instruction data.
@@ -125,7 +137,7 @@ impl I {
     /// assert!(cpu.get(Flag::IllegalHalt));
     /// ```
     pub fn jmp(address: u8) -> Self {
-        I(Instr::Jmp(Jmp(address)))
+        I::Jmp(Jmp(address))
     }
 
     /// Jump to the address specified by the instruction data if the A register is zero.
@@ -147,7 +159,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 0);
     /// ```
     pub fn jpz(address: u8) -> Self {
-        I(Instr::Jpz(Jpz(address)))
+        I::Jpz(Jpz(address))
     }
 
     /// Jump to the address specified by the instruction data if the carry flag is set.
@@ -170,7 +182,7 @@ impl I {
     /// assert_eq!(cpu.ip(), 0x00);
     /// ```
     pub fn jpc(address: u8) -> Self {
-        I(Instr::Jpc(Jpc(address)))
+        I::Jpc(Jpc(address))
     }
 
     /// Call the `out` function with the contents of register A.
@@ -196,7 +208,7 @@ impl I {
     /// assert_eq!(*calls.borrow(), vec![0x0D]);
     /// ```
     pub fn out() -> Self {
-        I(Instr::Out(Out))
+        I::Out(Out)
     }
 
     /// Halt the CPU
@@ -213,32 +225,32 @@ impl I {
     /// assert_eq!(cpu.ip(), 0);
     /// ```
     pub fn hlt() -> Self {
-        I(Instr::Hlt(Hlt))
+        I::Hlt(Hlt)
     }
 
     pub (super) fn from_opcode(opcode: u8) -> IBuilder {
         if opcode == Nop::opcode() {
-            IBuilder::Complete(I(Instr::Nop(Nop)))
+            IBuilder::Complete(I::Nop(Nop))
         } else if opcode == Ldi::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Ldi(Ldi(0))))
+            IBuilder::NeedsData(IWithoutData(I::Ldi(Ldi(0))))
         } else if opcode == Lda::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Lda(Lda(0))))
+            IBuilder::NeedsData(IWithoutData(I::Lda(Lda(0))))
         } else if opcode == Sta::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Sta(Sta(0))))
+            IBuilder::NeedsData(IWithoutData(I::Sta(Sta(0))))
         } else if opcode == Add::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Add(Add(0))))
+            IBuilder::NeedsData(IWithoutData(I::Add(Add(0))))
         } else if opcode == Sub::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Sub(Sub(0))))
+            IBuilder::NeedsData(IWithoutData(I::Sub(Sub(0))))
         } else if opcode == Jmp::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Jmp(Jmp(0))))
+            IBuilder::NeedsData(IWithoutData(I::Jmp(Jmp(0))))
         } else if opcode == Jpz::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Jpz(Jpz(0))))
+            IBuilder::NeedsData(IWithoutData(I::Jpz(Jpz(0))))
         } else if opcode == Jpc::opcode() {
-            IBuilder::NeedsData(IWithoutData(Instr::Jpc(Jpc(0))))
+            IBuilder::NeedsData(IWithoutData(I::Jpc(Jpc(0))))
         } else if opcode == Out::opcode() {
-            IBuilder::Complete(I(Instr::Out(Out)))
+            IBuilder::Complete(I::Out(Out))
         } else if opcode == Hlt::opcode() {
-            IBuilder::Complete(I(Instr::Hlt(Hlt)))
+            IBuilder::Complete(I::Hlt(Hlt))
         } else {
             IBuilder::Invalid
         }
@@ -251,20 +263,20 @@ pub (super) enum IBuilder {
     NeedsData(IWithoutData),
 }
 
-pub (super) struct IWithoutData(Instr);
+pub (super) struct IWithoutData(I);
 
 impl IWithoutData {
     pub (super) fn with_data(self, data: u8) -> I {
         match self.0 {
-            Instr::Ldi(_) => I(Instr::Ldi(Ldi(data))),
-            Instr::Lda(_) => I(Instr::Lda(Lda(data))),
-            Instr::Sta(_) => I(Instr::Sta(Sta(data))),
-            Instr::Add(_) => I(Instr::Add(Add(data))),
-            Instr::Sub(_) => I(Instr::Sub(Sub(data))),
-            Instr::Jmp(_) => I(Instr::Jmp(Jmp(data))),
-            Instr::Jpz(_) => I(Instr::Jpz(Jpz(data))),
-            Instr::Jpc(_) => I(Instr::Jpc(Jpc(data))),
-            instr => I(instr),
+            I::Ldi(_) => I::Ldi(Ldi(data)),
+            I::Lda(_) => I::Lda(Lda(data)),
+            I::Sta(_) => I::Sta(Sta(data)),
+            I::Add(_) => I::Add(Add(data)),
+            I::Sub(_) => I::Sub(Sub(data)),
+            I::Jmp(_) => I::Jmp(Jmp(data)),
+            I::Jpz(_) => I::Jpz(Jpz(data)),
+            I::Jpc(_) => I::Jpc(Jpc(data)),
+            instr => instr,
         }
     }
 }
@@ -275,91 +287,77 @@ pub (super) trait Instruction {
     fn next(&self, cpu: &Cpu) -> u8;
 }
 
-enum Instr {
-    Nop(Nop),
-    Ldi(Ldi),
-    Lda(Lda),
-    Sta(Sta),
-    Add(Add),
-    Sub(Sub),
-    Jmp(Jmp),
-    Jpz(Jpz),
-    Jpc(Jpc),
-    Out(Out),
-    Hlt(Hlt),
-}
-
-struct Nop;
+pub struct Nop;
 impl Nop {
     fn opcode() -> u8 {
         0
     }
 }
 
-struct Ldi(u8);
+pub struct Ldi(u8);
 impl Ldi {
     fn opcode() -> u8 {
         1
     }
 }
 
-struct Lda(u8);
+pub struct Lda(u8);
 impl Lda {
     fn opcode() -> u8 {
         2
     }
 }
 
-struct Sta(u8);
+pub struct Sta(u8);
 impl Sta {
     fn opcode() -> u8 {
         3
     }
 }
 
-struct Add(u8);
+pub struct Add(u8);
 impl Add {
     fn opcode() -> u8 {
         4
     }
 }
 
-struct Sub(u8);
+pub struct Sub(u8);
 impl Sub {
     fn opcode() -> u8 {
         5
     }
 }
 
-struct Jmp(u8);
+pub struct Jmp(u8);
 impl Jmp {
     fn opcode() -> u8 {
         6
     }
 }
 
-struct Jpz(u8);
+pub struct Jpz(u8);
 impl Jpz {
     fn opcode() -> u8 {
         7
     }
 }
 
-struct Jpc(u8);
+pub struct Jpc(u8);
 impl Jpc {
     fn opcode() -> u8 {
         8
     }
 }
 
-struct Out;
+pub struct Out;
 impl Out {
     fn opcode() -> u8 {
         14
     }
 }
 
-struct Hlt;
+pub struct Hlt;
 impl Hlt {
     fn opcode() -> u8 {
         15
@@ -368,64 +366,50 @@ impl Hlt {
 
 impl Instruction for I {
     fn assemble(&self) -> Vec<u8> {
-        self.0.assemble()
-    }
-
-    fn execute(&self, cpu: &mut Cpu) {
-        self.0.execute(cpu)
-    }
-
-    fn next(&self, cpu: &Cpu) -> u8 {
-        self.0.next(cpu)
-    }
-}
-
-impl Instruction for Instr {
-    fn assemble(&self) -> Vec<u8> {
         match self {
-            Instr::Nop(nop) => nop.assemble(),
-            Instr::Ldi(ldi) => ldi.assemble(),
-            Instr::Lda(lda) => lda.assemble(),
-            Instr::Sta(sta) => sta.assemble(),
-            Instr::Add(add) => add.assemble(),
-            Instr::Sub(sub) => sub.assemble(),
-            Instr::Jmp(jmp) => jmp.assemble(),
-            Instr::Jpz(jpz) => jpz.assemble(),
-            Instr::Jpc(jpc) => jpc.assemble(),
-            Instr::Out(out) => out.assemble(),
-            Instr::Hlt(hlt) => hlt.assemble(),
+            I::Nop(nop) => nop.assemble(),
+            I::Ldi(ldi) => ldi.assemble(),
+            I::Lda(lda) => lda.assemble(),
+            I::Sta(sta) => sta.assemble(),
+            I::Add(add) => add.assemble(),
+            I::Sub(sub) => sub.assemble(),
+            I::Jmp(jmp) => jmp.assemble(),
+            I::Jpz(jpz) => jpz.assemble(),
+            I::Jpc(jpc) => jpc.assemble(),
+            I::Out(out) => out.assemble(),
+            I::Hlt(hlt) => hlt.assemble(),
         }
     }
 
     fn execute(&self, cpu: &mut Cpu) {
         match self {
-            Instr::Nop(nop) => nop.execute(cpu),
-            Instr::Ldi(ldi) => ldi.execute(cpu),
-            Instr::Lda(lda) => lda.execute(cpu),
-            Instr::Sta(sta) => sta.execute(cpu),
-            Instr::Add(add) => add.execute(cpu),
-            Instr::Sub(sub) => sub.execute(cpu),
-            Instr::Jmp(jmp) => jmp.execute(cpu),
-            Instr::Jpz(jpz) => jpz.execute(cpu),
-            Instr::Jpc(jpc) => jpc.execute(cpu),
-            Instr::Out(out) => out.execute(cpu),
-            Instr::Hlt(hlt) => hlt.execute(cpu),
+            I::Nop(nop) => nop.execute(cpu),
+            I::Ldi(ldi) => ldi.execute(cpu),
+            I::Lda(lda) => lda.execute(cpu),
+            I::Sta(sta) => sta.execute(cpu),
+            I::Add(add) => add.execute(cpu),
+            I::Sub(sub) => sub.execute(cpu),
+            I::Jmp(jmp) => jmp.execute(cpu),
+            I::Jpz(jpz) => jpz.execute(cpu),
+            I::Jpc(jpc) => jpc.execute(cpu),
+            I::Out(out) => out.execute(cpu),
+            I::Hlt(hlt) => hlt.execute(cpu),
         }
     }
 
     fn next(&self, cpu: &Cpu) -> u8 {
         match self {
-            Instr::Nop(nop) => nop.next(cpu),
-            Instr::Ldi(ldi) => ldi.next(cpu),
-            Instr::Lda(lda) => lda.next(cpu),
-            Instr::Sta(sta) => sta.next(cpu),
-            Instr::Add(add) => add.next(cpu),
-            Instr::Sub(sub) => sub.next(cpu),
-            Instr::Jmp(jmp) => jmp.next(cpu),
-            Instr::Jpz(jpz) => jpz.next(cpu),
-            Instr::Jpc(jpc) => jpc.next(cpu),
-            Instr::Out(out) => out.next(cpu),
-            Instr::Hlt(hlt) => hlt.next(cpu),
+            I::Nop(nop) => nop.next(cpu),
+            I::Ldi(ldi) => ldi.next(cpu),
+            I::Lda(lda) => lda.next(cpu),
+            I::Sta(sta) => sta.next(cpu),
+            I::Add(add) => add.next(cpu),
+            I::Sub(sub) => sub.next(cpu),
+            I::Jmp(jmp) => jmp.next(cpu),
+            I::Jpz(jpz) => jpz.next(cpu),
+            I::Jpc(jpc) => jpc.next(cpu),
+            I::Out(out) => out.next(cpu),
+            I::Hlt(hlt) => hlt.next(cpu),
         }
     }
 }
