@@ -176,12 +176,27 @@ impl Cpu {
        self.flags &= !(1 << flag as u8);
     }
 
-    pub (super) fn write(&mut self, adr: u8, val: u8) {
+    /// Write the given value to the given address in RAM.
+    /// ```
+    /// use busyboard::eater::{Cpu, Flag, I};
+    /// let mut cpu = Cpu::from_asm(vec![
+    /// ], vec![]);
+    ///
+    /// cpu.write(0, 0x01);
+    /// cpu.write(1, 0x96);
+    /// cpu.write(2, 0x0f);
+    /// cpu.step();
+    ///
+    /// assert_eq!(cpu.read(0), Some(0x01));
+    /// assert_eq!(cpu.read(1), Some(0x96));
+    /// assert_eq!(cpu.a(), 0x96);
+    pub fn write(&mut self, adr: u8, val: u8) {
         if adr as usize >= self.ram.len() {
-            self.set(Flag::IllegalHalt);
-        } else {
-            self.ram[adr as usize] = val;
+            let padding = vec![0; adr as usize - self.ram.len() + 1];
+            self.ram.extend(padding);
         }
+
+        self.ram[adr as usize] = val;
     }
 }
 
