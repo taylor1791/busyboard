@@ -18,6 +18,5 @@ fn main() -> std::io::Result<()> {
     ], vec![0x01, 0x00, 100]);
 
     let simulator = Simulator::from(cpu);
-    Ui::new(std::time::Duration::from_millis(1000))
-        .run(simulator)
+    Ui::new().run(simulator)
 }

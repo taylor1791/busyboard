@@ -15,22 +15,21 @@ use std::{
 
 type Tui = ratatui::terminal::Terminal<CrosstermBackend<io::Stdout>>;
 
-pub struct Ui {
-    action_deadline: Duration,
-}
+pub struct Ui;
 
 pub trait ActionLoop {
     type Action;
 
     fn action(&self, key: event::KeyEvent) -> Option<Self::Action>;
     fn exited(&self) -> bool;
+    fn deadline(&self) -> &Duration;
     fn deadline_expired(&self) -> Option<Self::Action>;
     fn update(&mut self, action: Self::Action);
 }
 
 impl Ui {
-    pub fn new(action_deadline: Duration) -> Self {
-        Self { action_deadline }
+    pub fn new() -> Self {
+        Self
     }
 
     pub fn run<W>(&self, widget: W) -> Result<()>
@@ -83,11 +82,12 @@ impl Ui {
         let start = std::time::Instant::now();
 
         loop {
-            if start.elapsed() > self.action_deadline {
+            let deadline = widget.deadline().clone();
+            if start.elapsed() > deadline {
                 return widget.deadline_expired();
             }
 
-            let deadline = self.action_deadline - start.elapsed();
+            let deadline = deadline - start.elapsed();
             if event::poll(deadline).unwrap() {
                 if let event::Event::Key(key) = event::read().unwrap() {
                     if let Some(action) = widget.action(key) {

@@ -12,11 +12,13 @@ use ratatui::{
 };
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::Duration;
 
 pub struct Simulator {
     cpu: Cpu,
     mode: Mode,
     out: Rc<RefCell<Out>>,
+    rate: Duration,
     ui: Ui,
 }
 
@@ -50,6 +52,7 @@ pub enum Action {
     Quit,
     Shift,
     Step,
+    Turbo,
 }
 
 pub struct Ui {
@@ -69,6 +72,8 @@ pub struct Out {
 
 impl Simulator {
     pub fn from(cpu: Cpu) -> Self {
+        let rate = Duration::from_millis(1000);
+
         let ui = Ui {
             previous_ax: cpu.a(),
             previous_bytes: cpu.read_bytes(0, cpu.len() as u8).to_vec(),
@@ -98,7 +103,11 @@ impl Simulator {
             }
         });
 
-        Self { cpu, mode: Mode::Execute, out: out.clone(), ui }
+        Self { cpu, rate, mode: Mode::Execute, out: out.clone(), ui }
+    }
+
+    pub fn is_turbo(&self) -> bool {
+        self.rate != Duration::from_millis(1000)
     }
 }
 
@@ -107,6 +116,7 @@ impl ActionLoop for Simulator {
 
     fn action(&self, key: KeyEvent) -> Option<Self::Action> {
         match key.code {
+            KeyCode::Char('a') if self.mode == Mode::Execute => Some(Action::Turbo),
             KeyCode::Char('s') if self.mode == Mode::Execute => Some(Action::Mode(Mode::Step)),
             KeyCode::Char('d') if self.mode == Mode::Execute => Some(Action::Mode(Mode::Edit(Edit::IP))),
             KeyCode::Char('a') if self.mode == Mode::Step => Some(Action::Mode(Mode::Execute)),
@@ -123,6 +133,10 @@ impl ActionLoop for Simulator {
 
     fn exited(&self) -> bool {
         self.mode == Mode::Exit
+    }
+
+    fn deadline(&self) -> &Duration {
+        &self.rate
     }
 
     fn deadline_expired(&self) -> Option<Self::Action> {
@@ -164,6 +178,13 @@ impl ActionLoop for Simulator {
             Action::Step => {
                 self.cpu.step();
             },
+            Action::Turbo => {
+                self.rate = if self.is_turbo() {
+                    Duration::from_millis(1000)
+                } else {
+                    Duration::from_millis(50)
+                };
+            },
          }
     }
 }
@@ -173,7 +194,7 @@ impl ratatui::widgets::WidgetRef for Simulator {
         let bytes = self.cpu.read_bytes(0, self.cpu.len() as u8);
 
         let chrome_height = 2;
-        let instructions = instructions::instructions(&self.mode);
+        let instructions = instructions::instructions(&self.mode, self.is_turbo());
         let chrome = Block::bordered()
             .title("Simulator")
             .title_bottom(instructions.centered());

@@ -1,7 +1,7 @@
 use super::{Edit, Mode};
 use ratatui::prelude::{Line, Stylize};
 
-pub fn instructions(mode: &Mode) -> Line {
+pub fn instructions(mode: &Mode, turbo: bool) -> Line {
     let mut line = vec![format!(" {}:", mode.to_string()).bold().magenta()];
 
     match mode {
@@ -18,6 +18,8 @@ pub fn instructions(mode: &Mode) -> Line {
             " Exit ".bold().into(), "<q> ".blue().bold(),
         ]),
         Mode::Execute => line.extend(vec![
+            if turbo { " Normal ".bold().into() } else { " Turbo ".bold().into() },
+            "<a>".blue().bold(),
             " Step ".bold().into(), "<s>".blue().bold(),
             " Seek ".bold().into(), "<d>".blue().bold(),
             " Exit ".bold().into(), "<q> ".blue().bold(),
