@@ -1,5 +1,6 @@
 mod hexdump;
 mod registers;
+mod out;
 
 use crate::{eater::{Cpu, Flag}, ui::ActionLoop};
 use crossterm::event::{KeyEvent, KeyCode};
@@ -7,11 +8,14 @@ use ratatui::{
     prelude::{Layout, Line, Rect, Stylize, Widget},
     widgets::Block,
 };
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub struct Simulator {
     cpu: Cpu,
     mode: Mode,
-    ui: Ui
+    out: Rc<RefCell<Out>>,
+    ui: Ui,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -37,6 +41,12 @@ pub struct Ui {
     previous_flag_i: bool,
 }
 
+pub struct Out {
+    data: [u8; 16],
+    n: usize,
+    new: bool,
+}
+
 impl Simulator {
     pub fn from(cpu: Cpu) -> Self {
         let ui = Ui {
@@ -48,7 +58,27 @@ impl Simulator {
             previous_flag_i: cpu.get(Flag::IllegalHalt),
         };
 
-        Self { cpu, mode: Mode::Execute, ui }
+        let out = Rc::new(RefCell::new(Out {
+            data: [0; 16],
+            n: 0,
+            new: false,
+        }));
+
+        let cpu_out = out.clone();
+        let cpu = cpu.with_out(move |data| {
+            let mut out = cpu_out.borrow_mut();
+            let n = out.n;
+
+            out.data[n % 16] = data;
+            out.new = true;
+            out.n += 1;
+
+            if n >= 512 {
+                out.n = 256;
+            }
+        });
+
+        Self { cpu, mode: Mode::Execute, out: out.clone(), ui }
     }
 }
 
@@ -77,6 +107,7 @@ impl ActionLoop for Simulator {
     }
 
     fn update(&mut self, action: Self::Action) {
+        self.out.borrow_mut().new = false;
         self.ui.previous_bytes = self.cpu.read_bytes(0, self.cpu.len() as u8).to_vec();
         self.ui.previous_ax = self.cpu.a();
         self.ui.previous_ip = self.cpu.ip();
@@ -114,23 +145,28 @@ impl ratatui::widgets::WidgetRef for Simulator {
         let register_height = 7; // Title, AX, IP, C, H, I, padding
         let registers = registers::registers(&self.cpu, &self.ui);
 
+        let out_height = 2 + 1; // 2 Lines plus bottom padding
+        let out = out::out(self.out.borrow());
+
         // Each byte is 2 characters, plus a space (or a colon), horizontal padding, and a border.
         let dump_width = 17 * 3 + 2 + 2;
         let dump_height = 1 + ((bytes.len() + 15) / 16) as u16 + 2; // Title + Lines + border
         let dump = hexdump::hexdump(self.cpu.ip(), &bytes, &self.ui.previous_bytes);
 
         let width = dump_width + 2; // Add 2 for the border
-        let height = chrome_height + register_height + dump_height;
+        let height = chrome_height + register_height + out_height + dump_height;
         let area = Rect::new(area.x, area.y, width, area.height.min(height));
         let areas = Layout::vertical(vec![
             ratatui::prelude::Constraint::Length(register_height),
+            ratatui::prelude::Constraint::Length(out_height),
             ratatui::prelude::Constraint::Length(dump_height),
         ]).split(Rect::new(area.x + 1, area.y + 1, area.width - 2, area.height - 2));
         let register_area = Rect::new(areas[0].width - registers_width, areas[0].y, registers_width, register_height);
 
         chrome.render(area, buffer);
         registers.render(register_area, buffer);
-        dump.render(areas[1], buffer);
+        out.render(areas[1], buffer);
+        dump.render(areas[2], buffer);
     }
 }
 
