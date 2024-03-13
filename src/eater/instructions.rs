@@ -448,6 +448,8 @@ impl Instruction for Lda {
     fn execute(&self, cpu: &mut Cpu) {
         if let Some(a) = cpu.read(self.0) {
             cpu.a = a;
+        } else {
+            cpu.set(Flag::IllegalHalt);
         }
     }
 
@@ -484,6 +486,8 @@ impl Instruction for Add {
             }
 
             cpu.a = cpu.a.wrapping_add(operand);
+        } else {
+            cpu.set(Flag::IllegalHalt);
         }
     }
 
@@ -506,6 +510,8 @@ impl Instruction for Sub {
             }
 
             cpu.a = cpu.a.wrapping_sub(operand);
+        } else {
+            cpu.set(Flag::IllegalHalt);
         }
     }
 

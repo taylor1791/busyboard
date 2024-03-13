@@ -54,7 +54,9 @@ pub fn disassemble(bytes: &[u8]) -> Vec<Disassembly> {
                     I::Nop(..) | I::Hlt(..) | I::Out(..) => 1,
                     I::Ldi(..) | I::Lda(..) | I::Sta(..) | I::Add(..) | I::Sub(..) => 2,
                     I::Jmp(..) | I::Jpz(..) | I::Jpc(..) => {
-                        stack.push(data[1]);
+                        if (data[1] as usize) < bytes.len() {
+                            stack.push(data[1]);
+                        }
                         2
                     },
                 };

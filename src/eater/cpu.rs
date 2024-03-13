@@ -81,9 +81,17 @@ impl Cpu {
         self.ram.len()
     }
 
-    pub (super) fn read(&mut self, adr: u8) -> Option<u8> {
+    /// Read the value at the given address in RAM.
+    /// ```
+    /// use busyboard::eater::{Cpu, Flag, I};
+    /// let mut cpu = Cpu::from_asm(vec![
+    ///     I::hlt(),
+    /// ], vec![]);
+    ///
+    /// assert_eq!(cpu.read(0), Some(15));
+    /// ```
+    pub fn read(&mut self, adr: u8) -> Option<u8> {
         if adr as usize >= self.ram.len() {
-            self.set(Flag::IllegalHalt);
             return None
         }
 
