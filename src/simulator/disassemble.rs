@@ -15,7 +15,7 @@ pub fn disassemble<'a>(disassembly: &'a [Disassembly], ip: u8, bytes: &'a [u8], 
 
                     let n = format!("{:02x}", data[i]);
                     let n = if offset + i == ip { n.magenta().bold().underlined() } else { n.into() };
-                    let n = if data[i] != previous_bytes[offset + i] { n.green() } else { n.into() };
+                    let n = if has_changed(data, i, previous_bytes, offset + i) { n.green() } else { n.into() };
                     line.push(n);
 
                     line.push(Span::raw(" "));
@@ -23,7 +23,7 @@ pub fn disassemble<'a>(disassembly: &'a [Disassembly], ip: u8, bytes: &'a [u8], 
                     if i + 1 < data.len() {
                         let n = format!("{:02x}", data[i + 1]);
                         let n = if offset + i + 1 == ip { n.magenta().bold().underlined() } else { n.into() };
-                        let n = if data[i + 1] != previous_bytes[offset + i + 1] { n.green() } else { n.into() };
+                        let n = if has_changed(data, i + 1, previous_bytes, offset + i + 1) { n.green() } else { n.into() };
                         line.push(n);
                     }
 
@@ -35,7 +35,7 @@ pub fn disassemble<'a>(disassembly: &'a [Disassembly], ip: u8, bytes: &'a [u8], 
 
                 let formatted = to_string(&instruction).bold();
                 let formatted = if offset == ip { formatted.magenta().bold().underlined() } else { formatted };
-                let formatted = if bytes[offset] != previous_bytes[offset] { formatted.green() } else { formatted };
+                let formatted = if has_changed(bytes, offset, previous_bytes, offset) { formatted.green() } else { formatted };
                 line.push(formatted);
 
                 line.push(Span::raw(" "));
@@ -44,7 +44,7 @@ pub fn disassemble<'a>(disassembly: &'a [Disassembly], ip: u8, bytes: &'a [u8], 
                     I::Sub(..) | I::Jmp(..) | I::Jpz(..) | I::Jpc(..) = instruction {
                     let data = format!("{:02x}", bytes[offset + 1]);
                     let data = if offset + 1 == ip { data.magenta().bold().underlined() } else { data.into() };
-                    let data = if bytes[offset + 1] != previous_bytes[offset + 1] { data.green() } else { data.into() };
+                    let data = if has_changed(bytes, offset + 1, previous_bytes, offset + 1) { data.green() } else { data.into() };
                     line.push(data);
                 }
 
@@ -70,4 +70,12 @@ fn to_string(i: &I) -> String {
         I::Out(..) => "Out",
         I::Hlt(..) => "Hlt",
     }.to_string()
+}
+
+fn has_changed(bytes: &[u8], current: usize, previous_bytes: &[u8], previous: usize) -> bool {
+    if previous >= previous_bytes.len() {
+        return true;
+    }
+
+    bytes[current] != previous_bytes[previous]
 }

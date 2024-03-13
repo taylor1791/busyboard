@@ -16,7 +16,7 @@ pub fn hexdump(ip: u8, bytes: &[u8], previous_bytes: &[u8]) -> impl Widget {
 
             let n = format!("{:02x}", byte);
             let n = if b == ip { n.magenta().bold().underlined() } else { Span::raw(n) };
-            let n = if *byte != previous_bytes[b as usize] { n.green() } else { n };
+            let n = if has_changed(b, bytes, previous_bytes) { n.green() } else { n };
 
             line.push(n);
 
@@ -32,4 +32,12 @@ pub fn hexdump(ip: u8, bytes: &[u8], previous_bytes: &[u8]) -> impl Widget {
         .padding(Padding::horizontal(1)));
 
     dump
+}
+
+fn has_changed(index: u8, bytes: &[u8], previous_bytes: &[u8]) -> bool {
+    if index as usize >= previous_bytes.len() {
+        return true;
+    }
+
+    bytes[index as usize] != previous_bytes[index as usize]
 }
